@@ -1,0 +1,57 @@
+# Fork 专用:定时同步上游 NousResearch/hermes-agent → 本 fork 的 main。
+# 需要在仓库 Settings → Secrets → Actions 中配置 SYNC_TOKEN(PAT,含 repo + workflow 权限),
+# 否则合并了上游 workflow 改动的推送会被 GITHUB_TOKEN 拒绝。
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: '0 21 * * *' # 每天 UTC 21:00(北京时间早上 5 点)
+  workflow_dispatch: {} # 支持手动触发
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # 防止 workflow 被再次 fork 后在别人仓库里跑
+    if: github.repository == 'KSwisFish/hermes-agent'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
+
+      - name: Merge upstream/main
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/NousResearch/hermes-agent.git
+          git fetch upstream main
+          BEFORE=$(git rev-parse HEAD)
+          if ! git merge --no-edit upstream/main; then
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            echo "::error::与上游合并冲突，需要手动处理"
+            exit 1
+          fi
+          if [ "$BEFORE" != "$(git rev-parse HEAD)" ]; then
+            git push origin main
+            echo "已同步上游新提交：$BEFORE..$(git rev-parse --short HEAD)"
+          else
+            echo "已是最新，无需同步"
+          fi
+
+      - name: Open issue on conflict
+        if: failure() && steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "⚠️ 上游同步冲突 $(date +%F)" \
+            --body "自动合并 upstream/main 时发生冲突，请本地执行：git pull upstream main 手动解决后推送。运行详情：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            || true
