@@ -121,7 +121,12 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
       .getConfig()
       .then(config => {
         if (!cancelled) {
-          setLocaleState(normalizeLocale(getConfigDisplayLanguage(config)))
+          // An explicit config value wins; when the user never chose a language
+          // we keep the caller-provided initial locale (our default UI language)
+          // instead of forcing DEFAULT_LOCALE.
+          const configured = getConfigDisplayLanguage(config)
+          const unset = configured === undefined || configured === null || configured === ''
+          setLocaleState(unset ? normalizeLocale(initialLocale) : normalizeLocale(configured))
         }
       })
       .catch(error => {

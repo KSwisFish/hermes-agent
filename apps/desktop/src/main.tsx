@@ -44,7 +44,8 @@ if (winParam === 'overlay') {
     <StrictMode>
       <ErrorBoundary label="root">
         <QueryClientProvider client={queryClient}>
-          <I18nProvider>
+          {/* 二开默认语言：简体中文。用户在设置里选过语言则以配置为准。 */}
+          <I18nProvider initialLocale="zh">
             <ThemeProvider>
               <HapticsProvider>
                 {/* ONE tooltip provider for the whole app. Every `Tip` used to
