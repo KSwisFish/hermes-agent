@@ -136,8 +136,8 @@ foreach ($tmpVar in @('TEMP', 'TMP')) {
 # Configuration
 # ============================================================================
 
-$RepoUrlSsh = "git@gitee.com:ten-billion/hermes-agent.git"
-$RepoUrlHttps = "https://gitee.com/ten-billion/hermes-agent.git"
+$RepoUrlSsh = "git@gitee.com:fish_zzc/hermes-agent.git"
+$RepoUrlHttps = "https://gitee.com/fish_zzc/hermes-agent.git"
 $PythonVersion = "3.11"
 # Minor versions the installer accepts when the requested $PythonVersion isn't
 # available, in preference order.  uv discovers both uv-managed and system
@@ -1663,13 +1663,13 @@ function Install-Repository {
                 # for.  Gitee's archive endpoint accepts commits, tags, and
                 # branches under the same path; we honour Commit > Tag > Branch.
                 if ($Commit) {
-                    $zipUrl = "https://gitee.com/ten-billion/hermes-agent/repository/archive/$Commit.zip"
+                    $zipUrl = "https://gitee.com/fish_zzc/hermes-agent/repository/archive/$Commit.zip"
                     $zipLabel = $Commit
                 } elseif ($Tag) {
-                    $zipUrl = "https://gitee.com/ten-billion/hermes-agent/repository/archive/$Tag.zip"
+                    $zipUrl = "https://gitee.com/fish_zzc/hermes-agent/repository/archive/$Tag.zip"
                     $zipLabel = $Tag
                 } else {
-                    $zipUrl = "https://gitee.com/ten-billion/hermes-agent/repository/archive/$Branch.zip"
+                    $zipUrl = "https://gitee.com/fish_zzc/hermes-agent/repository/archive/$Branch.zip"
                     $zipLabel = $Branch
                 }
                 $zipPath = "$env:TEMP\hermes-agent-$zipLabel.zip"
