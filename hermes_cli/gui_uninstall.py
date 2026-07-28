@@ -64,7 +64,14 @@ def log_warn(msg: str):
 
 def _agent_root(hermes_home: Path) -> Path:
     """The agent checkout root — same layout install.sh / install.ps1 use."""
-    return hermes_home / "hermes-agent"
+    lumina = hermes_home / "lumina-agent"
+    if lumina.exists():
+        return lumina
+    # Pre-rebrand checkout location, still honoured for older installs.
+    legacy = hermes_home / "hermes-agent"
+    if legacy.exists():
+        return legacy
+    return lumina
 
 
 def desktop_userdata_dir() -> Path:

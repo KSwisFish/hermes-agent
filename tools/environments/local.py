@@ -661,17 +661,22 @@ def _find_bash() -> str:
     #
     # Layouts (both checked so upgrades between MinGit and PortableGit
     # installs work transparently):
-    #   PortableGit: %LOCALAPPDATA%\hermes\git\bin\bash.exe   (primary)
-    #   MinGit:      %LOCALAPPDATA%\hermes\git\usr\bin\bash.exe (legacy/32-bit fallback)
+    #   PortableGit: %LOCALAPPDATA%\lumina\git\bin\bash.exe   (primary)
+    #   MinGit:      %LOCALAPPDATA%\lumina\git\usr\bin\bash.exe (legacy/32-bit fallback)
+    # The old %LOCALAPPDATA%\hermes\git location is still probed for installs
+    # made before the lumina rebrand.
     _local_appdata = os.environ.get("LOCALAPPDATA", "")
-    _hermes_portable_git = os.path.join(_local_appdata, "hermes", "git") if _local_appdata else ""
-    if _hermes_portable_git:
-        for candidate in (
-            os.path.join(_hermes_portable_git, "bin", "bash.exe"),        # PortableGit (primary)
-            os.path.join(_hermes_portable_git, "usr", "bin", "bash.exe"), # MinGit fallback
+    if _local_appdata:
+        for _portable_root in (
+            os.path.join(_local_appdata, "lumina", "git"),
+            os.path.join(_local_appdata, "hermes", "git"),
         ):
-            if os.path.isfile(candidate) and candidate not in candidates:
-                candidates.append(candidate)
+            for candidate in (
+                os.path.join(_portable_root, "bin", "bash.exe"),        # PortableGit (primary)
+                os.path.join(_portable_root, "usr", "bin", "bash.exe"), # MinGit fallback
+            ):
+                if os.path.isfile(candidate) and candidate not in candidates:
+                    candidates.append(candidate)
 
     # Check known Git for Windows install locations before PATH lookup.
     # On machines with both WSL and Git for Windows, shutil.which("bash")
@@ -692,7 +697,7 @@ def _find_bash() -> str:
     # Prefer the first candidate that can actually start.  A stale
     # HERMES_GIT_BASH_PATH pointing at a broken Git-for-Windows install
     # (``Directory \\drivers\\etc does not exist``) must not win over a
-    # healthy portable Git under %LOCALAPPDATA%\\hermes\\git.
+    # healthy portable Git under %LOCALAPPDATA%\\lumina\\git.
     for candidate in candidates:
         if _bash_starts(candidate):
             if candidate != custom and custom and os.path.isfile(custom):

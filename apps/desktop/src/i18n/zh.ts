@@ -2439,7 +2439,7 @@ export const zh: Translations = {
     chooseLater: '稍后再选择提供方',
     recommended: '推荐',
     connected: '已连接',
-    featuredPitch: '一个订阅，300+ 前沿模型 — 运行 Hermes 的推荐方式',
+    featuredPitch: '一个订阅，300+ 前沿模型 — 运行 lumina 的推荐方式',
     fireworksPitch: '直接模型 API — Fireworks 托管的前沿模型',
     openRouterPitch: '一个密钥，数百个模型 — 稳妥的默认选择',
     apiKeyOptions: {

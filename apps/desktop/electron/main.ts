@@ -467,17 +467,17 @@ if (INSTALL_STAMP) {
 // scripts/install.ps1's $HermesHome and scripts/install.sh's $HERMES_HOME.
 //
 // Defaults:
-//   Windows: %LOCALAPPDATA%\hermes (matches install.ps1)
-//   macOS / Linux: ~/.hermes (matches install.sh)
+//   Windows: %LOCALAPPDATA%\lumina (matches install.ps1)
+//   macOS / Linux: ~/.lumina (matches install.sh)
 //
-// Special case for Windows: if the user has a legacy ~/.hermes directory
+// Special case for Windows: if the user has a legacy ~/.lumina directory
 // (e.g., from a prior pip install or a manual setup) AND no
-// %LOCALAPPDATA%\hermes yet, prefer the legacy path so we don't orphan their
+// %LOCALAPPDATA%\lumina yet, prefer the legacy path so we don't orphan their
 // existing config / sessions / .env. New installs go to %LOCALAPPDATA%.
 //
 // HERMES_DESKTOP_USER_DATA_DIR (used by test:desktop:fresh) puts the sandbox
 // HERMES_HOME beneath the throwaway userData dir so a fresh-install run never
-// touches the user's real ~/.hermes / %LOCALAPPDATA%\hermes.
+// touches the user's real ~/.lumina / %LOCALAPPDATA%\lumina.
 function resolveHermesHome() {
   if (process.env.HERMES_HOME) {
     return normalizeHermesHomeRoot(process.env.HERMES_HOME)
@@ -491,7 +491,7 @@ function resolveHermesHome() {
     // A GUI app launched from Explorer inherits the environment block captured
     // at login, so a HERMES_HOME set via `setx` AFTER login is invisible in
     // process.env even though the CLI (a fresh shell) sees it. Without this the
-    // backend silently falls back to %LOCALAPPDATA%\hermes and reports "No
+    // backend silently falls back to %LOCALAPPDATA%\lumina and reports "No
     // inference provider configured" despite a valid configured home (#45471).
     // Consult the live User-scoped registry value before the default below.
     const fromRegistry = readWindowsUserEnvVar('HERMES_HOME')
@@ -502,11 +502,11 @@ function resolveHermesHome() {
   }
 
   if (IS_WINDOWS && process.env.LOCALAPPDATA) {
-    const localappdata = path.join(process.env.LOCALAPPDATA, 'hermes')
-    const legacy = path.join(app.getPath('home'), '.hermes')
+    const localappdata = path.join(process.env.LOCALAPPDATA, 'lumina')
+    const legacy = path.join(app.getPath('home'), '.lumina')
 
     // Migrate transparently to LOCALAPPDATA, but honour an existing legacy
-    // ~/.hermes setup (no LOCALAPPDATA install yet) so users don't lose state.
+    // ~/.lumina setup (no LOCALAPPDATA install yet) so users don't lose state.
     if (!directoryExists(localappdata) && directoryExists(legacy)) {
       return legacy
     }
@@ -514,7 +514,7 @@ function resolveHermesHome() {
     return localappdata
   }
 
-  return path.join(app.getPath('home'), '.hermes')
+  return path.join(app.getPath('home'), '.lumina')
 }
 
 const HERMES_HOME = resolveHermesHome()
@@ -537,7 +537,7 @@ function pathWithHermesManagedNode(...entries) {
 // ACTIVE_HERMES_ROOT — the canonical mutable Hermes install. Same path
 // install.ps1 / install.sh use, so a desktop-only user and a CLI-only user end
 // up with identical layouts and can share one install.
-const ACTIVE_HERMES_ROOT = path.join(HERMES_HOME, 'hermes-agent')
+const ACTIVE_HERMES_ROOT = path.join(HERMES_HOME, 'lumina-agent')
 // VENV_ROOT — venv lives inside the repo, exactly like install.ps1 does it.
 const VENV_ROOT = path.join(ACTIVE_HERMES_ROOT, 'venv')
 // BOOTSTRAP_COMPLETE_MARKER — written by the first-launch bootstrap runner
@@ -2102,7 +2102,7 @@ function makeDashboardReadyFile() {
 }
 
 // resolveGitBinary — locate git.exe on Windows. A fresh installer-driven
-// install only has PortableGit under %LOCALAPPDATA%\hermes\git (never on
+// install only has PortableGit under %LOCALAPPDATA%\lumina\git (never on
 // PATH), so a bare spawn('git') ENOENTs and self-update checks fail with
 // "Couldn't check for updates". Mirror findGitBash: PortableGit first, then
 // standard Git-for-Windows locations, then PATH. Cached after first probe.
@@ -2123,6 +2123,9 @@ function resolveGitBinary() {
   const candidates = []
 
   if (localAppData) {
+    candidates.push(path.join(localAppData, 'lumina', 'git', 'cmd', 'git.exe'))
+    candidates.push(path.join(localAppData, 'lumina', 'git', 'bin', 'git.exe'))
+    // Pre-rebrand PortableGit location, still honoured for older installs.
     candidates.push(path.join(localAppData, 'hermes', 'git', 'cmd', 'git.exe'))
     candidates.push(path.join(localAppData, 'hermes', 'git', 'bin', 'git.exe'))
   }

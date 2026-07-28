@@ -1878,7 +1878,7 @@ export const ar = defineLocale({
       skipped: 'تم التخطي',
       failed: 'فشل'
     },
-    oneTimeTitle: 'يحتاج Hermes إلى تثبيت لمرة واحدة',
+    oneTimeTitle: 'يحتاج lumina إلى تثبيت لمرة واحدة',
     unsupportedDesc: platform =>
       `التثبيت التلقائي عند أول تشغيل غير متاح على ${platform} بعد. افتح الطرفية وشغّل الأمر أدناه، ثم أعد تشغيل هذا التطبيق. ستتخطى عمليات التشغيل اللاحقة هذه الخطوة.`,
     installCommand: 'أمر التثبيت',
@@ -1887,12 +1887,12 @@ export const ar = defineLocale({
     installTo: 'سيتم التثبيت في',
     retryAfterRun: 'لقد شغّلته -- إعادة المحاولة',
     failedTitle: 'فشل التثبيت',
-    settingUpTitle: 'جار إعداد وكيل Hermes',
+    settingUpTitle: 'جار إعداد lumina',
     finishingTitle: 'جار الإنهاء',
     failedDesc:
-      'فشلت إحدى خطوات التثبيت. على Windows، قد يحدث هذا إذا كان هناك نسخة أخرى من Hermes CLI أو تطبيق سطح المكتب قيد التشغيل. أوقف أي نسخ Hermes قيد التشغيل، ثم أعد المحاولة. تحقق من التفاصيل أدناه أو من سجل سطح المكتب للحصول على النص الكامل.',
+      'فشلت إحدى خطوات التثبيت. على Windows، قد يحدث هذا إذا كان هناك نسخة أخرى من lumina CLI أو تطبيق سطح المكتب قيد التشغيل. أوقف أي نسخ lumina قيد التشغيل، ثم أعد المحاولة. تحقق من التفاصيل أدناه أو من سجل سطح المكتب للحصول على النص الكامل.',
     activeDesc:
-      'هذا إعداد لمرة واحدة. يقوم مثبّت Hermes بتنزيل التبعيات وتهيئة جهازك. ستتخطى عمليات التشغيل اللاحقة هذه الخطوة.',
+      'هذا إعداد لمرة واحدة. يقوم مثبّت lumina بتنزيل التبعيات وتهيئة جهازك. ستتخطى عمليات التشغيل اللاحقة هذه الخطوة.',
     progress: (completed, total) => `اكتملت ${completed} من ${total} خطوة`,
     currentStage: stage => ` -- الآن: ${stage}`,
     fetchingManifest: 'جار جلب بيان المثبّت...',
@@ -1909,10 +1909,10 @@ export const ar = defineLocale({
     reloadRetry: 'إعادة التحميل وإعادة المحاولة'
   },
   onboarding: {
-    headerTitle: 'لنُعِدّ لك Hermes Agent',
+    headerTitle: 'لنُعِدّ لك lumina',
     headerDesc: 'اربط مزوّد نماذج لبدء المحادثة. معظم الخيارات تتطلب نقرة واحدة.',
-    preparingInstall: 'يُكمل Hermes التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
-    starting: 'جار بدء Hermes...',
+    preparingInstall: 'يُكمل lumina التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
+    starting: 'جار بدء lumina...',
     lookingUpProviders: 'جار البحث عن المزوّدين...',
     collapse: 'طي',
     otherProviders: 'مزودون آخرون',
@@ -1920,7 +1920,7 @@ export const ar = defineLocale({
     chooseLater: 'سأختار مزوّدا لاحقا',
     recommended: 'موصى به',
     connected: 'متصل',
-    featuredPitch: 'اشتراك واحد، أكثر من 300 نموذج متقدم — الطريقة الموصى بها لتشغيل Hermes',
+    featuredPitch: 'اشتراك واحد، أكثر من 300 نموذج متقدم — الطريقة الموصى بها لتشغيل lumina',
     fireworksPitch: 'نماذج مفتوحة سريعة مع استضافة Fireworks.',
     openRouterPitch: 'مفتاح واحد لمئات النماذج — خيار افتراضي جيد',
     apiKeyOptions: {

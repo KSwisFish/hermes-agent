@@ -23,8 +23,8 @@ param(
     # exact ref.  Precedence: Commit > Tag > Branch.
     [string]$Commit = "",
     [string]$Tag = "",
-    [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" }),
-    [string]$InstallDir = $(if ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }),
+    [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\lumina" }),
+    [string]$InstallDir = $(if ($env:HERMES_HOME) { "$env:HERMES_HOME\lumina-agent" } else { "$env:LOCALAPPDATA\lumina\lumina-agent" }),
 
     # --- Stage protocol (additive; default invocation behaves as before) ----
     # See the "Stage protocol" section near the bottom of the file for the
@@ -810,7 +810,7 @@ function Install-Git {
       1. Existing ``git`` on PATH -- use it as-is (the common fast path).
       2. Download **PortableGit** from the official git-for-windows GitHub
          release (self-extracting 7z.exe) and unpack it to
-         ``%LOCALAPPDATA%\hermes\git`` -- never touches system Git, never
+         ``%LOCALAPPDATA%\lumina\git`` -- never touches system Git, never
          requires admin, works even on locked-down machines and machines
          with a broken system Git install.
 
@@ -824,7 +824,7 @@ function Install-Git {
     We deliberately skip winget because it fails badly when the system Git
     install is in a half-installed state (partially registered, or uninstall-
     blocked).  Owning the Hermes copy of Git ourselves is predictable and
-    recoverable: if it ever breaks, ``Remove-Item %LOCALAPPDATA%\hermes\git``
+    recoverable: if it ever breaks, ``Remove-Item %LOCALAPPDATA%\lumina\git``
     and re-running this installer fully recovers.
 
     After install we locate ``bash.exe`` and persist the path in
@@ -2272,8 +2272,8 @@ function Set-PathVariable {
     }
     
     # Set HERMES_HOME so the Python code finds config/data in the right place.
-    # Only needed on Windows where we install to %LOCALAPPDATA%\hermes instead
-    # of the Unix default ~/.hermes
+    # Only needed on Windows where we install to %LOCALAPPDATA%\lumina instead
+    # of the Unix default ~/.lumina
     $currentHermesHome = [Environment]::GetEnvironmentVariable("HERMES_HOME", "User")
     if (-not $currentHermesHome -or $currentHermesHome -ne $HermesHome) {
         [Environment]::SetEnvironmentVariable("HERMES_HOME", $HermesHome, "User")
@@ -2367,7 +2367,7 @@ function Write-BootstrapMarker {
 function Copy-ConfigTemplates {
     Write-Info "Setting up configuration files..."
     
-    # Create the HERMES_HOME directory structure ($HermesHome, default %LOCALAPPDATA%\hermes)
+    # Create the HERMES_HOME directory structure ($HermesHome, default %LOCALAPPDATA%\lumina)
     New-Item -ItemType Directory -Force -Path "$HermesHome\cron" | Out-Null
     New-Item -ItemType Directory -Force -Path "$HermesHome\sessions" | Out-Null
     New-Item -ItemType Directory -Force -Path "$HermesHome\logs" | Out-Null

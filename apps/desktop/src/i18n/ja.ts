@@ -2039,7 +2039,7 @@ export const ja = defineLocale({
       skipped: 'スキップ',
       failed: '失敗'
     },
-    oneTimeTitle: 'Hermes には一度限りのインストールが必要です',
+    oneTimeTitle: 'lumina には一度限りのインストールが必要です',
     unsupportedDesc: platform =>
       `${platform} では自動の初回インストールはまだ利用できません。ターミナルを開いて以下のコマンドを実行し、このアプリを再起動してください。以降の起動ではこの手順はスキップされます。`,
     installCommand: 'インストールコマンド',
@@ -2047,25 +2047,25 @@ export const ja = defineLocale({
     viewDocs: 'インストールドキュメントを見る',
     installTo: 'インストール先',
     retryAfterRun: '実行しました — 再試行',
-    setupChoiceTitle: 'Hermes Desktop をセットアップ',
+    setupChoiceTitle: 'lumina をセットアップ',
     setupChoiceDesc:
-      'すでに実行している Hermes ゲートウェイに接続するか、このコンピューターに Hermes をローカルインストールします。',
-    connectExistingTitle: '既存の Hermes に接続',
+      'すでに実行している lumina ゲートウェイに接続するか、このコンピューターに lumina をローカルインストールします。',
+    connectExistingTitle: '既存の lumina に接続',
     connectExistingShort: '既存環境に接続',
     connectExistingDesc:
       'セッショントークンまたはブラウザーサインインでリモートバックエンドを使用します。ローカルインストールは開始されません。',
-    installLocalTitle: 'Hermes をローカルにインストール',
-    installLocalDesc: 'Hermes をダウンロードし、Python 環境を作成して、このコンピューターでバックエンドを実行します。',
+    installLocalTitle: 'lumina をローカルにインストール',
+    installLocalDesc: 'lumina をダウンロードし、Python 環境を作成して、このコンピューターでバックエンドを実行します。',
     localStartUnavailable:
-      'ローカルインストールを開始できません。Hermes Desktop を再起動して、もう一度お試しください。',
-    remoteSetupTitle: '既存の Hermes に接続',
+      'ローカルインストールを開始できません。lumina を再起動して、もう一度お試しください。',
+    remoteSetupTitle: '既存の lumina に接続',
     remoteSetupDesc:
-      'ゲートウェイ URL を入力してください。Hermes Desktop がトークンとブラウザーサインインのどちらが必要かを検出します。',
+      'ゲートウェイ URL を入力してください。lumina がトークンとブラウザーサインインのどちらが必要かを検出します。',
     remoteUrlTitle: 'ゲートウェイ URL',
-    remoteUrlDesc: 'Hermes ゲートウェイのベース URL を使用します。リモートの場合は https:// を含めてください。',
+    remoteUrlDesc: 'lumina ゲートウェイのベース URL を使用します。リモートの場合は https:// を含めてください。',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'ゲートウェイ認証方式を検出中...',
-    probeError: 'その Hermes ゲートウェイに到達できませんでした。',
+    probeError: 'その lumina ゲートウェイに到達できませんでした。',
     identityProvider: 'ID プロバイダー',
     authTitle: '認証',
     authNeedsOauth: provider => `このゲートウェイをテストする前に ${provider} でサインインしてください。`,
@@ -2085,12 +2085,12 @@ export const ja = defineLocale({
     applyRemote: '適用して再接続',
     backToSetup: '戻る',
     failedTitle: 'インストールに失敗しました',
-    settingUpTitle: 'Hermes Agent を設定中',
+    settingUpTitle: 'lumina を設定中',
     finishingTitle: '仕上げ中',
     failedDesc:
-      'インストール手順のいずれかが失敗しました。Windows では、別の Hermes CLI またはデスクトップインスタンスが実行中の場合に発生することがあります。実行中の Hermes インスタンスをすべて停止してから再試行してください。詳細は以下またはデスクトップログで確認できます。',
+      'インストール手順のいずれかが失敗しました。Windows では、別の lumina CLI またはデスクトップインスタンスが実行中の場合に発生することがあります。実行中の lumina インスタンスをすべて停止してから再試行してください。詳細は以下またはデスクトップログで確認できます。',
     activeDesc:
-      'これは一回限りのセットアップです。Hermes インストーラーが依存関係をダウンロードしてマシンを設定しています。以降の起動ではこの手順はスキップされます。',
+      'これは一回限りのセットアップです。lumina インストーラーが依存関係をダウンロードしてマシンを設定しています。以降の起動ではこの手順はスキップされます。',
     progress: (completed, total) => `${total} ステップ中 ${completed} 完了`,
     currentStage: stage => ` — 現在: ${stage}`,
     fetchingManifest: 'インストーラーマニフェストを取得中...',
@@ -2108,10 +2108,10 @@ export const ja = defineLocale({
   },
 
   onboarding: {
-    headerTitle: 'Hermes Agent のセットアップをしましょう',
+    headerTitle: 'lumina のセットアップをしましょう',
     headerDesc: 'チャットを始めるにはモデルプロバイダーを接続してください。ほとんどのオプションはワンクリックです。',
-    preparingInstall: 'Hermes はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
-    starting: 'Hermes を起動中…',
+    preparingInstall: 'lumina はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
+    starting: 'lumina を起動中…',
     lookingUpProviders: 'プロバイダーを検索中...',
     collapse: '折りたたむ',
     otherProviders: 'その他のプロバイダー',
@@ -2119,7 +2119,7 @@ export const ja = defineLocale({
     chooseLater: '後でプロバイダーを選択します',
     recommended: '推奨',
     connected: '接続済み',
-    featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Hermes を実行するための推奨方法',
+    featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — lumina を実行するための推奨方法',
     fireworksPitch: '直接モデル API — Fireworks がホストする最先端モデル',
     openRouterPitch: '1 つのキーで数百のモデル — 堅実なデフォルト',
     apiKeyOptions: {

@@ -323,8 +323,9 @@ def _hermes_path_markers(hermes_home: Path) -> list[str]:
     """Path-entry substrings that identify Hermes-owned User-PATH entries."""
     root = str(hermes_home).rstrip("\\/")
     # Match on prefix so sub-entries (git\cmd, git\bin, git\usr\bin, node, etc.)
-    # all get swept.  Also match the bare hermes-agent install dir.
-    markers = [root + "\\hermes-agent", root + "\\git", root + "\\node", root + "\\venv"]
+    # all get swept.  Also match the bare agent install dir (current and
+    # pre-rebrand names).
+    markers = [root + "\\lumina-agent", root + "\\hermes-agent", root + "\\git", root + "\\node", root + "\\venv"]
     # Also match if HERMES_HOME was customised to somewhere else — find-and-nuke
     # any entry whose path component contains "hermes".  We don't want to catch
     # unrelated entries like "chermes-foo" or "ephermeral", so we look for
@@ -399,7 +400,7 @@ def remove_hermes_env_vars_windows() -> list[str]:
 
 def remove_portable_tooling_windows(hermes_home: Path) -> list[Path]:
     """Delete PortableGit and Node installs the Windows installer created under
-    ``%LOCALAPPDATA%\\hermes\\``.  Only called on full uninstall; they're
+    ``%LOCALAPPDATA%\\lumina\\``.  Only called on full uninstall; they're
     isolated from any system Git / Node so they cannot break other tools."""
     removed: list[Path] = []
     for sub in ("git", "node", "gateway-service"):
@@ -501,6 +502,7 @@ def run_gui_uninstall(args):
     never the Python agent or its venv.
     """
     from hermes_cli.gui_uninstall import (
+        _agent_root,
         agent_is_installed,
         gui_install_summary,
         uninstall_gui,
@@ -533,7 +535,7 @@ def run_gui_uninstall(args):
     print()
     if agent_is_installed(hermes_home):
         print(color("Kept intact:", Colors.GREEN, Colors.BOLD))
-        print(f"  • The Hermes agent at {hermes_home / 'hermes-agent'}")
+        print(f"  • The Hermes agent at {_agent_root(hermes_home)}")
         print(f"  • Your config, sessions, and secrets under {hermes_home}")
         print()
 
