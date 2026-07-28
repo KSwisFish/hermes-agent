@@ -132,7 +132,9 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
       .catch(error => {
         if (!cancelled) {
           setConfigLoadError(toError(error))
-          setLocaleState(DEFAULT_LOCALE)
+          // 首启 bootstrap 期间后端未就绪时 /api/config 会失败；此时保持调用方
+          // 提供的默认界面语言（二开默认 zh），而不是强制回退英文。
+          setLocaleState(normalizeLocale(initialLocale))
         }
       })
       .finally(() => {

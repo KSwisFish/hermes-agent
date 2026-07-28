@@ -1,5 +1,6 @@
 import { type CSSProperties, useState } from 'react'
 
+import { useI18n } from '@/i18n'
 import { capitalize, normalize } from '@/lib/text'
 
 import introCopyJsonl from './intro-copy.jsonl?raw'
@@ -144,7 +145,32 @@ function pickCopy(copies: IntroCopy[], seed = 0): IntroCopy {
   return copies[Math.abs(seed) % copies.length] || FALLBACK_COPY[0]
 }
 
-const WORDMARK = 'HERMES AGENT'
+// 二开品牌：lumina（原 HERMES AGENT 字标）
+const WORDMARK = 'LUMINA'
+
+// 中文界面下 new session 欢迎语固定用中文，不走英文 personality 文案。
+const ZH_FALLBACK_COPY: IntroCopy[] = [
+  {
+    headline: '今天要推进什么？',
+    body: '把任务、报错或还没想清楚的点子发过来，我会先了解仓库，再给出下一步的具体行动。'
+  },
+  {
+    headline: '在想什么？',
+    body: '把代码、问题或卡住的地方发给我，我会先看清上下文再动手。'
+  },
+  {
+    headline: '想让我看什么？',
+    body: '发来任务、出错的路径或半成型的计划，我来帮你把它落地。'
+  },
+  {
+    headline: '从哪里开始？',
+    body: '把问题、目标或文件发给我，我会先调查清楚，让下一步足够具体。'
+  },
+  {
+    headline: '有什么需要处理？',
+    body: '把你手头的信息发过来，我来帮你整理成计划或直接修复。'
+  }
+]
 
 function resolveCopy(personality?: string, seed?: number): IntroCopy {
   const personalityKey = normalizeKey(personality)
@@ -157,8 +183,10 @@ function resolveCopy(personality?: string, seed?: number): IntroCopy {
 }
 
 export function Intro({ personality, seed }: IntroProps) {
+  const { locale } = useI18n()
   const [mountSeed] = useState(() => Math.floor(Math.random() * 100000))
-  const copy = resolveCopy(personality, mountSeed + (seed ?? 0))
+  const isChinese = locale === 'zh' || locale === 'zh-hant'
+  const copy = isChinese ? pickCopy(ZH_FALLBACK_COPY, mountSeed + (seed ?? 0)) : resolveCopy(personality, mountSeed + (seed ?? 0))
 
   return (
     <div
