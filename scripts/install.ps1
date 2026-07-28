@@ -146,6 +146,51 @@ $PythonVersion = "3.11"
 $PythonFallbackVersions = @("3.12", "3.13", "3.10")
 $NodeVersion = "22"
 
+# ----------------------------------------------------------------------------
+# Download mirrors (mainland-China friendly).
+#
+# The stock sources (github.com releases, nodejs.org, pypi.org, the npm
+# registry) are unreliable or extremely slow from mainland China.  Every
+# mirror below serves byte-identical artifacts with the same file names:
+#   - git-for-windows / node / python-build-standalone: npmmirror.com
+#     binary mirror (same layout as the upstream release trees)
+#   - npm packages: registry.npmmirror.com (same tarballs)
+#   - PyPI: TUNA index.  Used ONLY by the pip-interface fallback tiers;
+#     `uv sync --locked` keeps downloading the hash-pinned wheels recorded
+#     in uv.lock, so supply-chain guarantees are unchanged.
+# NOT mirrored on purpose:
+#   - uv itself: ships from Astral's own CDN (releases.astral.sh), which
+#     is already fast from China.
+#   - Playwright Chromium: npmmirror's playwright mirror is missing the
+#     win64 builds, so pointing PLAYWRIGHT_DOWNLOAD_HOST at it would break
+#     the browser install.
+#
+# Set HERMES_NO_MIRROR=1 to use the upstream origins instead.  Explicit
+# user-set env vars (UV_*, PIP_INDEX_URL, npm_config_registry) always win.
+$UseChinaMirrors = [string]::IsNullOrWhiteSpace($env:HERMES_NO_MIRROR)
+if ($UseChinaMirrors) {
+    $GitForWindowsBase = "https://registry.npmmirror.com/-/binary/git-for-windows"
+    $NodeDistBase      = "https://registry.npmmirror.com/-/binary/node"
+    # `uv python install` honours this documented env var; the mirror's
+    # <date>/<asset> layout matches the GitHub python-build-standalone
+    # releases 1:1.
+    if (-not $env:UV_PYTHON_INSTALL_MIRROR) {
+        $env:UV_PYTHON_INSTALL_MIRROR = "https://registry.npmmirror.com/-/binary/python-build-standalone"
+    }
+    # pip-interface only (`uv pip install ...`).  Deliberately NOT
+    # UV_DEFAULT_INDEX, which would also retarget `uv sync --locked` and
+    # invalidate the lockfile's pinned index.
+    if (-not $env:UV_INDEX_URL)  { $env:UV_INDEX_URL  = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+    if (-not $env:PIP_INDEX_URL) { $env:PIP_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+    # Every npm / npx invocation in this script (agent-browser install,
+    # browser-tools npm install, the npx playwright bootstrap) picks the
+    # registry up from the environment automatically.
+    if (-not $env:npm_config_registry) { $env:npm_config_registry = "https://registry.npmmirror.com" }
+} else {
+    $GitForWindowsBase = "https://github.com/git-for-windows/git/releases/download"
+    $NodeDistBase      = "https://nodejs.org/dist"
+}
+
 # Stage-protocol version.  Bumped only for genuinely breaking changes to the
 # manifest schema, stage-name set semantics, or stdout JSON shape.  Adding a
 # new stage does NOT bump this -- drivers iterate the manifest dynamically.
@@ -859,7 +904,8 @@ function Install-Git {
     }
 
     # Download PortableGit into $HermesHome\git.  Always works as long as
-    # we can reach github.com -- no admin, no winget, no reliance on the
+    # we can reach $GitForWindowsBase (npmmirror by default; github.com
+    # when HERMES_NO_MIRROR=1) -- no admin, no winget, no reliance on the
     # user's possibly-broken system Git install.
     Write-Info "Git not found -- downloading PortableGit to $HermesHome\git\ ..."
     Write-Info "(no admin rights required; isolated from any system Git install)"
@@ -902,7 +948,7 @@ function Install-Git {
             $downloadIsZip = $false
         }
 
-        $downloadUrl = "https://github.com/git-for-windows/git/releases/download/$gitTag/$assetName"
+        $downloadUrl = "$GitForWindowsBase/$gitTag/$assetName"
         $downloadExt = if ($downloadIsZip) { "zip" } else { "7z.exe" }
         $tmpFile = "$env:TEMP\$assetName"
         $gitDir = "$HermesHome\git"
@@ -1103,9 +1149,17 @@ function Test-Node {
     Write-Info "(no admin rights required; isolated from any system Node install)"
     try {
         $arch = Get-WindowsArch
-        $indexUrl = "https://nodejs.org/dist/latest-v${NodeVersion}.x/"
+        $indexUrl = "$NodeDistBase/latest-v${NodeVersion}.x/"
         $indexPage = Invoke-WebRequest -Uri $indexUrl -UseBasicParsing
-        $zipName = ($indexPage.Content | Select-String -Pattern "node-v${NodeVersion}\.\d+\.\d+-win-${arch}\.zip" -AllMatches).Matches[0].Value
+        # nodejs.org's latest-vNN.x/ index contains exactly one release, but
+        # npmmirror's listing for the same path aggregates every vNN.*
+        # release -- collect all matches and pick the newest instead of
+        # blindly taking the first.
+        $zipCandidates = ($indexPage.Content | Select-String -Pattern "node-v${NodeVersion}\.\d+\.\d+-win-${arch}\.zip" -AllMatches).Matches |
+            ForEach-Object { $_.Value } | Sort-Object -Unique
+        $zipName = $zipCandidates |
+            Sort-Object { [version]($_ -replace '^node-v', '' -replace '-win-.*$', '') } |
+            Select-Object -Last 1
 
         if ($zipName) {
             $downloadUrl = "${indexUrl}${zipName}"
