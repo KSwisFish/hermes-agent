@@ -228,12 +228,15 @@ function cachedScriptPath(hermesHome, commit) {
 }
 
 function downloadInstallScript(ref, destPath) {
-  // Fetch from GitHub raw at the install ref. Normal production builds pass a
-  // pinned SHA (immutable). Non-git fallback builds pass an unpinned branch
-  // ref so local builds can still bootstrap without pretending the all-zero
-  // placeholder is a real GitHub commit.
+  // Fetch from Gitee raw at the install ref -- the same fork the installer
+  // clones from (install.ps1's $RepoUrlHttps), so a stamp pinned to a fork
+  // commit always resolves. raw.githubusercontent.com is unreachable from
+  // mainland China and the upstream repo doesn't have fork commits anyway.
+  // Normal production builds pass a pinned SHA (immutable). Non-git fallback
+  // builds pass an unpinned branch ref so local builds can still bootstrap
+  // without pretending the all-zero placeholder is a real commit.
   const scriptName = installScriptName()
-  const url = `https://raw.githubusercontent.com/NousResearch/hermes-agent/${ref}/scripts/${scriptName}`
+  const url = `https://gitee.com/fish_zzc/hermes-agent/raw/${ref}/scripts/${scriptName}`
 
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(destPath), { recursive: true })
@@ -362,7 +365,7 @@ async function resolveInstallScript({
   emit({
     type: 'log',
     line:
-      `[bootstrap] fetching ${installScriptName()} for ${installRef.ref.slice(0, 12)} from GitHub` +
+      `[bootstrap] fetching ${installScriptName()} for ${installRef.ref.slice(0, 12)} from Gitee` +
       (installRef.pinned ? '' : ' (fallback, unpinned)')
   })
 
