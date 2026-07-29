@@ -181,6 +181,20 @@ def test_install_ps1_stops_venv_resident_processes_before_removing_venv() -> Non
     # chain (the GUI driver process).
     assert "$ancestorPids" in text
 
+    # Ancestor exclusion alone is not enough: Electron helper processes
+    # (renderer/GPU/utility) are ALSO named Hermes.exe and are children of the
+    # GUI main process — siblings of the stage, not ancestors. Killing them
+    # leaves the installer window alive but white/blank at the venv step. The
+    # name-based sweep must also spare the whole family of any hermes-named
+    # ancestor.
+    assert "$guiAncestorPids" in text
+    assert "$isGuiFamilyPid" in text
+    idx_family = text.index("$isGuiFamilyPid")
+    idx_name_sweep = text.index("Name = 'hermes.exe'")
+    assert idx_family < idx_name_sweep, (
+        "the GUI-family shield must be built before the hermes.exe name sweep"
+    )
+
     # The venv path-prefix sweep exists. It must match by case-insensitive
     # StartsWith, NOT PowerShell -like: a venv path containing wildcard
     # metacharacters ('[', ']') — legal in a Windows user name — silently fails

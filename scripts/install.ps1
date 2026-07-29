@@ -2042,10 +2042,12 @@ function Install-Venv {
             # is unavailable the chain stays empty and behavior degrades to
             # the old (self-killing) sweep rather than aborting the install.
             $ancestorPids = @{}
+            $parentOf = @{}
+            $nameOf = @{}
             try {
-                $parentOf = @{}
                 Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object {
                     $parentOf[[uint32]$_.ProcessId] = [uint32]$_.ParentProcessId
+                    $nameOf[[uint32]$_.ProcessId] = [string]$_.Name
                 }
                 $cursor = [uint32]$myPid
                 for ($hop = 0; $hop -lt 64 -and $parentOf.ContainsKey($cursor); $hop++) {
@@ -2057,16 +2059,53 @@ function Install-Venv {
             } catch {
                 Write-Warn "Could not resolve process ancestry: $($_.Exception.Message)"
             }
+            # Ancestor exclusion alone is not enough for the desktop GUI:
+            # Electron is multi-process, and every helper (renderer, GPU,
+            # utility) is ALSO named Hermes.exe.  Helpers are children of the
+            # GUI main process, i.e. SIBLINGS of this stage rather than
+            # ancestors -- killing them leaves the main window alive but
+            # blank (the "white screen" at the venv step).  Shield the whole
+            # family of any hermes-named ancestor (the GUI driver): a
+            # candidate whose parent chain reaches such an ancestor is part
+            # of the driving app.  The shield roots are restricted to
+            # hermes-named ancestors on purpose: a standalone hermes.exe
+            # launched from the same explorer.exe as the GUI shares plain
+            # ancestors with this stage but not the GUI itself, and it must
+            # still be killed or the venv stays locked.
+            $guiAncestorPids = @{}
+            foreach ($ancestorPid in @($ancestorPids.Keys)) {
+                if ($nameOf.ContainsKey($ancestorPid) -and $nameOf[$ancestorPid] -ieq 'hermes.exe') {
+                    $guiAncestorPids[$ancestorPid] = $true
+                }
+            }
+            $isGuiFamilyPid = {
+                param([uint32]$candidatePid)
+                $cursor = $candidatePid
+                for ($hop = 0; $hop -lt 64; $hop++) {
+                    if ($guiAncestorPids.ContainsKey($cursor)) { return $true }
+                    if (-not $parentOf.ContainsKey($cursor)) { return $false }
+                    $cursor = $parentOf[$cursor]
+                }
+                return $false
+            }
             # The launcher CLI (hermes.exe) plus its child tree.  Enumerated
-            # explicitly (instead of taskkill /IM) so the ancestor exclusion
-            # above applies; each match is still tree-killed with /T because
-            # the launcher's children are what actually hold the venv DLLs.
+            # explicitly (instead of taskkill /IM) so the ancestor + GUI-family
+            # exclusions above apply; each match is still tree-killed with /T
+            # because the launcher's children are what actually hold the venv
+            # DLLs.
             try {
                 Get-CimInstance Win32_Process -Filter "Name = 'hermes.exe'" -ErrorAction Stop |
-                    Where-Object { $_.ProcessId -ne $myPid -and -not $ancestorPids.ContainsKey([uint32]$_.ProcessId) } |
+                    Where-Object { $_.ProcessId -ne $myPid -and -not $ancestorPids.ContainsKey([uint32]$_.ProcessId) -and -not (& $isGuiFamilyPid ([uint32]$_.ProcessId)) } |
                     ForEach-Object {
-                        Write-Info "  stopping hermes.exe PID $($_.ProcessId) and its child tree"
-                        & taskkill /F /T /PID $_.ProcessId 2>$null | Out-Null
+                        # A candidate can vanish before its turn (e.g. it was a
+                        # child of an earlier /T tree-kill).  taskkill then
+                        # prints "not found" on stderr, which EAP=Stop turns
+                        # into a terminating error that would abort the whole
+                        # sweep -- relax EAP around the call and let the
+                        # no-op pass.
+                        $targetPid = $_.ProcessId
+                        Write-Info "  stopping hermes.exe PID $targetPid and its child tree"
+                        Invoke-NativeWithRelaxedErrorAction { & taskkill /F /T /PID $targetPid 2>$null | Out-Null }
                     }
             } catch {
                 Write-Warn "Could not enumerate hermes.exe processes: $($_.Exception.Message)"
