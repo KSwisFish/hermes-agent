@@ -159,11 +159,15 @@ $NodeVersion = "22"
 #     `uv sync --locked` keeps downloading the hash-pinned wheels recorded
 #     in uv.lock, so supply-chain guarantees are unchanged.
 # NOT mirrored on purpose:
-#   - uv itself: ships from Astral's own CDN (releases.astral.sh), which
-#     is already fast from China.
 #   - Playwright Chromium: npmmirror's playwright mirror is missing the
 #     win64 builds, so pointing PLAYWRIGHT_DOWNLOAD_HOST at it would break
 #     the browser install.
+# Mirrored via PyPI wheel instead of a binary mirror:
+#   - uv itself: releases.astral.sh (the astral installer's primary CDN)
+#     times out from mainland China without a proxy, so Install-Uv pulls
+#     the official uv wheel from the TUNA index and unpacks uv.exe from it
+#     (see Install-UvFromPyPiMirror); the astral installer remains the
+#     fallback.
 #
 # Set HERMES_NO_MIRROR=1 to use the upstream origins instead.  Explicit
 # user-set env vars (UV_*, PIP_INDEX_URL, npm_config_registry) always win.
@@ -487,6 +491,80 @@ function Get-PowerShellHostExe {
     return "powershell"
 }
 
+# China-mirror path for uv itself.  The astral installer downloads the
+# binary from releases.astral.sh first, github.com second -- and
+# releases.astral.sh flat-out times out from mainland China without a
+# proxy (verified 2026-07: proxied requests reach the CDN, direct ones
+# never connect), while github.com direct is unreliable at best.  The
+# TUNA PyPI mirror carries the official `uv` wheels, and a wheel is just
+# a zip with uv.exe inside -- so pull the latest win wheel from the same
+# index we already use for packages and unpack the binary from it.
+# Supply-chain note: same artifact as `pip install uv`, served by the
+# index the rest of the install already trusts.
+function Install-UvFromPyPiMirror {
+    param([string]$BinDir)
+
+    $wheelArch = switch (Get-WindowsArch) {
+        "x64"   { "win_amd64" }
+        "arm64" { "win_arm64" }
+        default { $null }
+    }
+    if (-not $wheelArch) {
+        Write-Warn "No uv wheel for this architecture on PyPI; falling back to the astral installer."
+        return $false
+    }
+
+    try {
+        # UV_INDEX_URL is already pointed at TUNA by the mirror block above
+        # (or at whatever index the user set -- hrefs resolve relative to
+        # the page, so any PEP 503 simple index works).
+        $indexBase = $env:UV_INDEX_URL
+        if ([string]::IsNullOrWhiteSpace($indexBase)) { $indexBase = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+        $pageUrl = $indexBase.TrimEnd('/') + "/uv/"
+        Write-Info "Fetching uv release list from $pageUrl ..."
+        $page = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing
+
+        # Collect every win wheel for this arch and pick the highest version
+        # ourselves -- don't assume the index lists them in order.
+        $wheelRe = "href=`"([^`"]*uv-(\d+\.\d+\.\d+)-py3-none-$wheelArch\.whl[^`"]*)`""
+        $candidates = [regex]::Matches($page.Content, $wheelRe)
+        if ($candidates.Count -eq 0) {
+            Write-Warn "No $wheelArch uv wheel found on $pageUrl"
+            return $false
+        }
+        $best = $candidates | Sort-Object { [version]$_.Groups[2].Value } | Select-Object -Last 1
+        $href = $best.Groups[1].Value.Split('#')[0]   # drop #sha256=... fragment
+        $wheelUrl = (New-Object System.Uri((New-Object System.Uri($pageUrl)), $href)).AbsoluteUri
+
+        Write-Info "Downloading uv $($best.Groups[2].Value) wheel from mirror ..."
+        # Expand-Archive (PS 5.1) refuses non-.zip extensions, so save as .zip.
+        $tmpZip = Join-Path $env:TEMP "hermes-uv-wheel.zip"
+        $tmpDir = Join-Path $env:TEMP "hermes-uv-extract"
+        Invoke-WebRequest -Uri $wheelUrl -OutFile $tmpZip -UseBasicParsing
+        if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
+        Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
+
+        # Binaries live under uv-<ver>.data/scripts/ inside the wheel; search
+        # recursively instead of hardcoding the layout.
+        $uvExe = Get-ChildItem -Path $tmpDir -Filter "uv.exe" -Recurse | Select-Object -First 1
+        if (-not $uvExe) {
+            Write-Warn "uv.exe not found inside the downloaded wheel"
+            return $false
+        }
+        Copy-Item $uvExe.FullName (Join-Path $BinDir "uv.exe") -Force
+        # uvx.exe ships in the same wheel; carry it along when present.
+        $uvxExe = Get-ChildItem -Path $tmpDir -Filter "uvx.exe" -Recurse | Select-Object -First 1
+        if ($uvxExe) { Copy-Item $uvxExe.FullName (Join-Path $BinDir "uvx.exe") -Force }
+
+        Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+        return $true
+    } catch {
+        Write-Warn "uv download via PyPI mirror failed: $_"
+        return $false
+    }
+}
+
 function Install-Uv {
     # Hermes owns its own uv at $HermesHome\bin\uv.exe.  Always install there --
     # no PATH probing, no conda guards, no multi-location resolution chains.
@@ -503,6 +581,23 @@ function Install-Uv {
 
     Write-Info "Installing managed uv into $HermesHome\bin ..."
     New-Item -ItemType Directory -Path (Join-Path $HermesHome "bin") -Force | Out-Null
+
+    # China-mirror mode: fetch the uv binary from the TUNA PyPI wheel first.
+    # releases.astral.sh (the astral installer's primary source) is not
+    # reachable from mainland China without a proxy -- see
+    # Install-UvFromPyPiMirror above.  Fall through to the astral installer
+    # when the mirror path fails so no environment is worse off.
+    if ($UseChinaMirrors) {
+        if (Install-UvFromPyPiMirror -BinDir (Join-Path $HermesHome "bin")) {
+            if (Test-Path $managedUv) {
+                $script:UvCmd = $managedUv
+                $version = & $managedUv --version
+                Write-Success "Managed uv installed from PyPI mirror ($version)"
+                return $true
+            }
+        }
+        Write-Warn "PyPI-mirror uv install failed; trying the astral installer ..."
+    }
 
     # UV_INSTALL_DIR tells the astral installer to place the binary
     # directly into $HermesHome\bin instead of ~/.local/bin.
