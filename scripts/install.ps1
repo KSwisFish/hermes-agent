@@ -2490,7 +2490,46 @@ print(','.join(scripts))
             throw "dashboard backend source failed syntax check: hermes_cli/web_server.py"
         }
     }
-    
+
+    # First-launch warmup. On Windows the first `hermes serve` after a fresh
+    # install pays a heavy one-time cost: python byte-compiles the whole
+    # import tree AND Defender scans every file on first touch. On slow
+    # machines that pushes backend readiness past the Desktop UI's 30s
+    # request timeout (upstream #62698 / #68705: "timed out after 30s:
+    # setup.runtime_check", skeleton screens, 6-provider fallback list).
+    # Importing the server entry modules here moves that one-time cost into
+    # the installer's progress output, so the first real launch starts warm.
+    # Best-effort: failures only warn -- the app still works, just colder.
+    if (Test-Path $pythonExe) {
+        Write-Info "Warming up backend (byte-compile + first-touch AV scan)..."
+        $warmupStart = Get-Date
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $warmupOut = & $pythonExe -c @"
+import importlib
+mods = ['hermes_cli.main', 'hermes_cli.web_server', 'tui_gateway.server']
+failed = []
+for m in mods:
+    try:
+        importlib.import_module(m)
+    except Exception as e:
+        failed.append('%s (%s)' % (m, type(e).__name__))
+if failed:
+    print('WARMUP-PARTIAL: ' + ', '.join(failed))
+"@ 2>&1
+        $warmupExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEAP
+        $warmupSecs = [int]((Get-Date) - $warmupStart).TotalSeconds
+        $warmupPartial = @($warmupOut | Where-Object { "$_" -like "WARMUP-PARTIAL*" })
+        if ($warmupExit -eq 0 -and $warmupPartial.Count -eq 0) {
+            Write-Success "Backend warmup complete (${warmupSecs}s)"
+        } elseif ($warmupPartial.Count -gt 0) {
+            Write-Warn "Backend warmup skipped some modules: $($warmupPartial[0]). First launch may be slower; install is otherwise fine."
+        } else {
+            Write-Warn "Backend warmup did not complete (exit $warmupExit, ${warmupSecs}s). First launch may be slower; install is otherwise fine."
+        }
+    }
+
     Pop-Location
     
     Write-Success "All dependencies installed"
