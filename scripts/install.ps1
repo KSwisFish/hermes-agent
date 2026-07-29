@@ -155,7 +155,8 @@ $NodeVersion = "22"
 #   - git-for-windows / node / python-build-standalone: npmmirror.com
 #     binary mirror (same layout as the upstream release trees)
 #   - npm packages: registry.npmmirror.com (same tarballs)
-#   - PyPI: TUNA index.  Used ONLY by the pip-interface fallback tiers;
+#   - PyPI: Aliyun index (TUNA as fallback).  Used ONLY by the
+#     pip-interface fallback tiers;
 #     `uv sync --locked` keeps downloading the hash-pinned wheels recorded
 #     in uv.lock, so supply-chain guarantees are unchanged.
 # NOT mirrored on purpose:
@@ -165,9 +166,9 @@ $NodeVersion = "22"
 # Mirrored via PyPI wheel instead of a binary mirror:
 #   - uv itself: releases.astral.sh (the astral installer's primary CDN)
 #     times out from mainland China without a proxy, so Install-Uv pulls
-#     the official uv wheel from the TUNA index and unpacks uv.exe from it
-#     (see Install-UvFromPyPiMirror); the astral installer remains the
-#     fallback.
+#     the official uv wheel from a mainland PyPI mirror index and unpacks
+#     uv.exe from it (see Install-UvFromPyPiMirror); the astral installer
+#     remains the fallback.
 #
 # Set HERMES_NO_MIRROR=1 to use the upstream origins instead.  Explicit
 # user-set env vars (UV_*, PIP_INDEX_URL, npm_config_registry) always win.
@@ -184,8 +185,16 @@ if ($UseChinaMirrors) {
     # pip-interface only (`uv pip install ...`).  Deliberately NOT
     # UV_DEFAULT_INDEX, which would also retarget `uv sync --locked` and
     # invalidate the lockfile's pinned index.
-    if (-not $env:UV_INDEX_URL)  { $env:UV_INDEX_URL  = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-    if (-not $env:PIP_INDEX_URL) { $env:PIP_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+    #
+    # Aliyun over TUNA: TUNA's /packages/ file tier intermittently answers
+    # 403 for non-browser clients on some networks (verified 2026-07: the
+    # /simple/ index page returns 200 while every /packages/ wheel URL
+    # returns 403 regardless of User-Agent, from IWR and curl alike), which
+    # kills both the uv-wheel bootstrap and the pip-interface dependency
+    # tiers.  Aliyun serves the same artifacts without that restriction.
+    # TUNA remains a fallback candidate in Install-UvFromPyPiMirror.
+    if (-not $env:UV_INDEX_URL)  { $env:UV_INDEX_URL  = "https://mirrors.aliyun.com/pypi/simple" }
+    if (-not $env:PIP_INDEX_URL) { $env:PIP_INDEX_URL = "https://mirrors.aliyun.com/pypi/simple" }
     # Every npm / npx invocation in this script (agent-browser install,
     # browser-tools npm install, the npx playwright bootstrap) picks the
     # registry up from the environment automatically.
@@ -514,55 +523,66 @@ function Install-UvFromPyPiMirror {
         return $false
     }
 
-    try {
-        # UV_INDEX_URL is already pointed at TUNA by the mirror block above
-        # (or at whatever index the user set -- hrefs resolve relative to
-        # the page, so any PEP 503 simple index works).
-        $indexBase = $env:UV_INDEX_URL
-        if ([string]::IsNullOrWhiteSpace($indexBase)) { $indexBase = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-        $pageUrl = $indexBase.TrimEnd('/') + "/uv/"
-        Write-Info "Fetching uv release list from $pageUrl ..."
-        $page = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing
+    # Candidate PEP 503 simple indexes, tried in order.  The user-set (or
+    # mirror-block-set) UV_INDEX_URL goes first; the hardcoded mainland
+    # mirrors back it up because a single mirror can reject the download
+    # tier while its index page still works (TUNA's /packages/ 403,
+    # verified 2026-07), and hrefs resolve relative to the page so any
+    # simple index works.  Duplicates are skipped.
+    $indexCandidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:UV_INDEX_URL)) { $indexCandidates += $env:UV_INDEX_URL }
+    $indexCandidates += "https://mirrors.aliyun.com/pypi/simple"
+    $indexCandidates += "https://pypi.tuna.tsinghua.edu.cn/simple"
+    $triedBases = @{}
+    foreach ($indexBase in $indexCandidates) {
+        $baseKey = $indexBase.TrimEnd('/')
+        if ($triedBases.ContainsKey($baseKey)) { continue }
+        $triedBases[$baseKey] = $true
+        try {
+            $pageUrl = $baseKey + "/uv/"
+            Write-Info "Fetching uv release list from $pageUrl ..."
+            $page = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing
 
-        # Collect every win wheel for this arch and pick the highest version
-        # ourselves -- don't assume the index lists them in order.
-        $wheelRe = "href=`"([^`"]*uv-(\d+\.\d+\.\d+)-py3-none-$wheelArch\.whl[^`"]*)`""
-        $candidates = [regex]::Matches($page.Content, $wheelRe)
-        if ($candidates.Count -eq 0) {
-            Write-Warn "No $wheelArch uv wheel found on $pageUrl"
-            return $false
+            # Collect every win wheel for this arch and pick the highest version
+            # ourselves -- don't assume the index lists them in order.
+            $wheelRe = "href=`"([^`"]*uv-(\d+\.\d+\.\d+)-py3-none-$wheelArch\.whl[^`"]*)`""
+            $candidates = [regex]::Matches($page.Content, $wheelRe)
+            if ($candidates.Count -eq 0) {
+                Write-Warn "No $wheelArch uv wheel found on $pageUrl"
+                continue
+            }
+            $best = $candidates | Sort-Object { [version]$_.Groups[2].Value } | Select-Object -Last 1
+            $href = $best.Groups[1].Value.Split('#')[0]   # drop #sha256=... fragment
+            $wheelUrl = (New-Object System.Uri((New-Object System.Uri($pageUrl)), $href)).AbsoluteUri
+
+            Write-Info "Downloading uv $($best.Groups[2].Value) wheel from mirror ..."
+            # Expand-Archive (PS 5.1) refuses non-.zip extensions, so save as .zip.
+            $tmpZip = Join-Path $env:TEMP "hermes-uv-wheel.zip"
+            $tmpDir = Join-Path $env:TEMP "hermes-uv-extract"
+            Invoke-WebRequest -Uri $wheelUrl -OutFile $tmpZip -UseBasicParsing
+            if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
+            Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
+
+            # Binaries live under uv-<ver>.data/scripts/ inside the wheel; search
+            # recursively instead of hardcoding the layout.
+            $uvExe = Get-ChildItem -Path $tmpDir -Filter "uv.exe" -Recurse | Select-Object -First 1
+            if (-not $uvExe) {
+                Write-Warn "uv.exe not found inside the downloaded wheel"
+                continue
+            }
+            Copy-Item $uvExe.FullName (Join-Path $BinDir "uv.exe") -Force
+            # uvx.exe ships in the same wheel; carry it along when present.
+            $uvxExe = Get-ChildItem -Path $tmpDir -Filter "uvx.exe" -Recurse | Select-Object -First 1
+            if ($uvxExe) { Copy-Item $uvxExe.FullName (Join-Path $BinDir "uvx.exe") -Force }
+
+            Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
+            return $true
+        } catch {
+            Write-Warn "uv download via $baseKey failed: $_"
         }
-        $best = $candidates | Sort-Object { [version]$_.Groups[2].Value } | Select-Object -Last 1
-        $href = $best.Groups[1].Value.Split('#')[0]   # drop #sha256=... fragment
-        $wheelUrl = (New-Object System.Uri((New-Object System.Uri($pageUrl)), $href)).AbsoluteUri
-
-        Write-Info "Downloading uv $($best.Groups[2].Value) wheel from mirror ..."
-        # Expand-Archive (PS 5.1) refuses non-.zip extensions, so save as .zip.
-        $tmpZip = Join-Path $env:TEMP "hermes-uv-wheel.zip"
-        $tmpDir = Join-Path $env:TEMP "hermes-uv-extract"
-        Invoke-WebRequest -Uri $wheelUrl -OutFile $tmpZip -UseBasicParsing
-        if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir }
-        Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
-
-        # Binaries live under uv-<ver>.data/scripts/ inside the wheel; search
-        # recursively instead of hardcoding the layout.
-        $uvExe = Get-ChildItem -Path $tmpDir -Filter "uv.exe" -Recurse | Select-Object -First 1
-        if (-not $uvExe) {
-            Write-Warn "uv.exe not found inside the downloaded wheel"
-            return $false
-        }
-        Copy-Item $uvExe.FullName (Join-Path $BinDir "uv.exe") -Force
-        # uvx.exe ships in the same wheel; carry it along when present.
-        $uvxExe = Get-ChildItem -Path $tmpDir -Filter "uvx.exe" -Recurse | Select-Object -First 1
-        if ($uvxExe) { Copy-Item $uvxExe.FullName (Join-Path $BinDir "uvx.exe") -Force }
-
-        Remove-Item -Force $tmpZip -ErrorAction SilentlyContinue
-        Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue
-        return $true
-    } catch {
-        Write-Warn "uv download via PyPI mirror failed: $_"
-        return $false
     }
+    return $false
 }
 
 function Install-Uv {
@@ -2008,8 +2028,49 @@ function Install-Venv {
             } catch {
                 Write-Warn "Could not enumerate gateway scheduled tasks: $($_.Exception.Message)"
             }
-            # The launcher CLI (hermes.exe) plus its child tree.
-            & taskkill /F /T /IM hermes.exe /FI "PID ne $myPid" 2>$null | Out-Null
+            # Collect this process's ancestor chain (parent, grandparent, ...)
+            # BEFORE any kill.  When a GUI driver runs this stage -- the
+            # Electron desktop app is literally named Hermes.exe and spawns
+            # install.ps1 via bootstrap-runner.ts -- a blind
+            # `taskkill /F /T /IM hermes.exe` matches the driver itself
+            # (image-name matching is case-insensitive) and /T then tree-kills
+            # this very powershell too: the installer GUI vanishes mid-venv
+            # ("closes instantly" at the venv step).  /FI "PID ne $myPid" only
+            # protects this powershell from a DIRECT image-name match; it
+            # cannot express "and not my parent".  So we enumerate targets
+            # ourselves and never kill our own ancestors.  Best-effort: if CIM
+            # is unavailable the chain stays empty and behavior degrades to
+            # the old (self-killing) sweep rather than aborting the install.
+            $ancestorPids = @{}
+            try {
+                $parentOf = @{}
+                Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object {
+                    $parentOf[[uint32]$_.ProcessId] = [uint32]$_.ParentProcessId
+                }
+                $cursor = [uint32]$myPid
+                for ($hop = 0; $hop -lt 64 -and $parentOf.ContainsKey($cursor); $hop++) {
+                    $parent = $parentOf[$cursor]
+                    if ($parent -eq 0 -or $ancestorPids.ContainsKey($parent)) { break }
+                    $ancestorPids[$parent] = $true
+                    $cursor = $parent
+                }
+            } catch {
+                Write-Warn "Could not resolve process ancestry: $($_.Exception.Message)"
+            }
+            # The launcher CLI (hermes.exe) plus its child tree.  Enumerated
+            # explicitly (instead of taskkill /IM) so the ancestor exclusion
+            # above applies; each match is still tree-killed with /T because
+            # the launcher's children are what actually hold the venv DLLs.
+            try {
+                Get-CimInstance Win32_Process -Filter "Name = 'hermes.exe'" -ErrorAction Stop |
+                    Where-Object { $_.ProcessId -ne $myPid -and -not $ancestorPids.ContainsKey([uint32]$_.ProcessId) } |
+                    ForEach-Object {
+                        Write-Info "  stopping hermes.exe PID $($_.ProcessId) and its child tree"
+                        & taskkill /F /T /PID $_.ProcessId 2>$null | Out-Null
+                    }
+            } catch {
+                Write-Warn "Could not enumerate hermes.exe processes: $($_.Exception.Message)"
+            }
             # taskkill /IM hermes.exe is NOT enough: the gateway/agent that a
             # scheduled task or watchdog autostarts runs as
             # `pythonw.exe -m hermes_cli.main gateway run` straight out of
@@ -2038,7 +2099,7 @@ function Install-Venv {
                 $found = 0
                 try {
                     Get-CimInstance Win32_Process -ErrorAction Stop |
-                        Where-Object { $_.ProcessId -ne $myPid -and $_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix, [System.StringComparison]::OrdinalIgnoreCase) } |
+                        Where-Object { $_.ProcessId -ne $myPid -and -not $ancestorPids.ContainsKey([uint32]$_.ProcessId) -and $_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix, [System.StringComparison]::OrdinalIgnoreCase) } |
                         ForEach-Object {
                             $found++
                             Write-Info "  stopping PID $($_.ProcessId) ($($_.Name)) running from venv"

@@ -165,8 +165,21 @@ def test_install_ps1_stops_venv_resident_processes_before_removing_venv() -> Non
     """
     text = INSTALL_PS1.read_text()
 
-    # The hermes.exe tree-kill is preserved (kills spawned child processes too).
-    assert 'taskkill /F /T /IM hermes.exe' in text
+    # The hermes.exe kill is preserved as a per-PID tree-kill (kills spawned
+    # child processes too). It must NOT be the blind `taskkill /IM hermes.exe`
+    # form: image-name matching is case-insensitive, so that form kills the
+    # Electron desktop GUI (executableName "Hermes") driving this very stage
+    # and /T tree-kills the stage's own powershell — the installer window
+    # "closes instantly" at the venv step.
+    assert "taskkill /F /T /PID" in text
+    # Match the invocation form (`& taskkill ...`) — the explanatory comment
+    # in install.ps1 still cites the old literal.
+    assert "& taskkill /F /T /IM hermes.exe" not in text, (
+        "blind /IM hermes.exe kill would tree-kill the GUI installer driving the stage"
+    )
+    # The enumerated kill and the venv sweep both spare the stage's ancestor
+    # chain (the GUI driver process).
+    assert "$ancestorPids" in text
 
     # The venv path-prefix sweep exists. It must match by case-insensitive
     # StartsWith, NOT PowerShell -like: a venv path containing wildcard
