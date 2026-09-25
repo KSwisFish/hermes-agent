@@ -492,6 +492,10 @@ export const frOverrides = {
     backendOutOfDateTitle: 'Backend obsolète',
     backendOutOfDateMessage:
       'Votre backend Hermes est plus ancien que cette version du desktop et peut ne pas fonctionner correctement. Mettez-le à jour pour les aligner.',
+    desktopOutOfDateTitle: 'Application Hermes obsolète',
+    desktopOutOfDateMessage:
+      "Cette application Hermes est plus ancienne que le backend auquel elle est connectée et peut ne pas fonctionner correctement. Effectuez la mise à jour de l'application pour les aligner.",
+    updateDesktopApp: "Mettre à jour l'application",
     installMethodUnsupportedTitle: "Méthode d'installation non prise en charge",
     updateHermes: 'Mettre à jour Hermes',
     updateReadyTitle: 'Mise à jour prête',
@@ -910,6 +914,8 @@ export const frOverrides = {
         agentSuccess: name => `Plugin de l'agent ${name} installé`,
         desktopSuccess: name => `Plugin Desktop ${name} installé`,
         agentFailed: "Échec de l'installation du plugin de l'agent",
+        installUncertain:
+          "Hermes n'attend plus le résultat de l'installation, mais le plugin est peut-être encore en cours d'installation. Fermez cette fenêtre et actualisez la liste des plugins avant de relancer l'installation.",
         desktopFailed: "Échec de l'installation du plugin Desktop",
         missingEnv: (name, vars) =>
           `${name} est installé, mais a besoin d'une clé pour fonctionner : ${vars}. Ajoutez-la maintenant, sinon les outils du plugin échoueront.`
@@ -3534,7 +3540,23 @@ export const frOverrides = {
       gatewayUnreachable: gateway => `${gateway} · inaccessible`,
       onGateway: (name, gateway) => `${name} · ${gateway}`,
       switchTo: (name, gateway) => `Basculer vers ${name} sur ${gateway}`,
-      deleteOn: gateway => ` sur ${gateway}`
+      deleteOn: gateway => ` sur ${gateway}`,
+      localDevice: 'Cet appareil (backend local — installe Hermes s’il manque, sinon ouvre une nouvelle session)',
+      switchDeviceTitle: 'Basculer vers cet appareil ?',
+      switchDeviceDesc:
+        'Cela ouvre une nouvelle session sur cet ordinateur. La conversation en cours reste sur l’autre gateway.',
+      switchDeviceConfirm: 'Basculer',
+      installDeviceTitle: 'Basculer vers cet appareil ?',
+      installDeviceDesc:
+        'Hermes sera installé localement, puis une nouvelle session s’ouvrira sur cet ordinateur. Rien n’est installé tant que vous ne confirmez pas.',
+      installDeviceConfirm: 'Installer localement',
+      connectExistingInstead: 'Connecter un existant à la place'
+    },
+    status: {
+      unread: (count: number) => (count === 1 ? '1 session non lue' : `${count} sessions non lues`),
+      needsInput: (count: number) =>
+        count === 1 ? '1 session attend votre réponse' : `${count} sessions attendent votre réponse`,
+      working: (count: number) => (count === 1 ? '1 session en cours' : `${count} sessions en cours`)
     },
     remoteOverride: {
       menuItem: 'Se connecter à un hôte distant…',
@@ -4032,6 +4054,7 @@ export const frOverrides = {
       branchFrom: 'Branche',
       rename: 'Renommer',
       archive: 'Archiver',
+      unarchive: 'Restaurer',
       newWindow: 'Nouvelle fenêtre',
       openInTerminal: 'Ouvrir dans le terminal',
       hideTabBar: "Masquer la barre d'onglets",
@@ -4437,7 +4460,7 @@ export const frOverrides = {
       copyFailure: 'Impossible de copier le critère dans le presse-papiers',
       continuationFailed: "Impossible de soumettre la poursuite de l'objectif",
       continuationQueued: 'Objectif repris — poursuite en attente de la fin du tour actuel',
-      continuationBusy: 'Objectif repris — session occupée, utilisez /interrupt pour poursuivre',
+      continuationBusy: "Objectif repris — session occupée, arrêtez d'abord la réponse en cours (bouton Stop ou Échap) pour poursuivre",
       controlUnavailable: msg => `Commandes de session indisponibles : ${msg}`,
       dismissError: "Masquer l'erreur",
       add: 'Ajouter'
@@ -4785,6 +4808,7 @@ export const frOverrides = {
     replaceCurrent: 'Remplacer la valeur actuelle',
     pasteApiKey: 'Collez votre clé API',
     localApiKeyPlaceholder: 'Clé API (facultatif — uniquement si votre point de terminaison en requiert une)',
+    localModelNamePlaceholder: 'Nom du modèle (ex. command-a-plus-05-2026)',
     couldNotSave: "Impossible d'enregistrer l'identifiant.",
     connecting: 'Connexion',
     update: 'Mettre à jour',
@@ -4938,6 +4962,7 @@ export const frOverrides = {
       search: 'Rechercher des modèles',
       noModels: 'Aucun modèle trouvé',
       editModels: 'Modifier les modèles…',
+      followDefault: 'Utiliser le modèle par défaut des Réglages',
       refreshModels: 'Actualiser les modèles',
       fast: 'Rapide'
     },
@@ -5073,7 +5098,8 @@ export const frOverrides = {
         title: 'Utilisation du contexte',
         tokenSummary: (used, max) => `${used} / ${max} jetons`
       },
-      session: 'Session',
+      focusedSince: 'Focalisé depuis',
+      focusedSinceTitle: 'Temps depuis que cette conversation est au premier plan — pas la durée d’un tour',
       yoloOn: 'YOLO activé — approbation automatique des commandes dangereuses. Shift+clic pour basculer globalement.',
       yoloOff: 'YOLO désactivé. Shift+clic pour basculer globalement.',
       modelNone: 'aucun',
@@ -5888,6 +5914,9 @@ export const frOverrides = {
     sessionUnavailable: 'Session indisponible',
     createSessionFailed: 'Impossible de créer une nouvelle session',
     promptFailed: "Échec de l'invite",
+    staleSessionTitle: 'Conversation obsolète',
+    staleSessionBody:
+      'Cette fenêtre était en retard sur une autre vue du même chat. Les derniers messages ont été chargés. Renvoyez si vous le souhaitez encore.',
     providerCredentialRequired: "Ajoutez un identifiant de fournisseur avant d'envoyer votre premier message.",
     emptySlashCommand: 'commande slash vide',
     desktopCommands: 'Commandes Desktop',
@@ -5933,6 +5962,8 @@ export const frOverrides = {
     deleteFailed: 'Échec de la suppression',
     archived: 'Archivé',
     archiveFailed: "Échec de l'archivage",
+    restored: 'Restauré',
+    unarchiveFailed: 'Échec de la restauration',
     cwdChangeFailed: 'Échec du changement de répertoire de travail',
     cwdStagedTitle: "Répertoire de travail en attente d'application",
     cwdStagedMessage: 'Redémarrez le backend desktop pour appliquer les modifications de cwd à cette session active.',
